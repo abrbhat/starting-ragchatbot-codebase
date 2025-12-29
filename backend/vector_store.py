@@ -264,4 +264,36 @@ class VectorStore:
             return None
         except Exception as e:
             print(f"Error getting lesson link: {e}")
+
+    def get_course_metadata(self, course_name: str) -> Optional[Dict[str, Any]]:
+        """
+        Get course metadata including lessons for a specific course.
+        Uses semantic search to find the best matching course.
+
+        Args:
+            course_name: Course title (partial matches work)
+
+        Returns:
+            Dict with course metadata including parsed lessons, or None if not found
+        """
+        import json
+        try:
+            # Use semantic search to find the best matching course
+            resolved_title = self._resolve_course_name(course_name)
+            if not resolved_title:
+                return None
+
+            # Get course by ID (title is the ID)
+            results = self.course_catalog.get(ids=[resolved_title])
+            if results and 'metadatas' in results and results['metadatas']:
+                metadata = results['metadatas'][0].copy()
+                # Parse lessons JSON
+                if 'lessons_json' in metadata:
+                    metadata['lessons'] = json.loads(metadata['lessons_json'])
+                    del metadata['lessons_json']
+                return metadata
+            return None
+        except Exception as e:
+            print(f"Error getting course metadata: {e}")
+            return None
     
