@@ -5,7 +5,7 @@ const API_URL = '/api';
 let currentSessionId = null;
 
 // DOM elements
-let chatMessages, chatInput, sendButton, totalCourses, courseTitles;
+let chatMessages, chatInput, sendButton, totalCourses, courseTitles, clearChatButton;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -15,6 +15,7 @@ document.addEventListener('DOMContentLoaded', () => {
     sendButton = document.getElementById('sendButton');
     totalCourses = document.getElementById('totalCourses');
     courseTitles = document.getElementById('courseTitles');
+    clearChatButton = document.getElementById('clearChatButton');
     
     setupEventListeners();
     createNewSession();
@@ -38,6 +39,9 @@ function setupEventListeners() {
             sendMessage();
         });
     });
+
+    // Clear chat button
+    clearChatButton.addEventListener('click', createNewSession);
 }
 
 
@@ -122,10 +126,20 @@ function addMessage(content, type, sources = null, isWelcome = false) {
     let html = `<div class="message-content">${displayContent}</div>`;
     
     if (sources && sources.length > 0) {
+        const formattedSources = sources.map(source => {
+            const parts = source.split('|');
+            const title = parts[0];
+            const url = parts[1];
+            if (url) {
+                return `<li><a href="${url}" target="_blank" rel="noopener">🔗 ${escapeHtml(title)}</a></li>`;
+            }
+            return `<li>${escapeHtml(title)}</li>`;
+        }).join('');
+
         html += `
             <details class="sources-collapsible">
                 <summary class="sources-header">Sources</summary>
-                <div class="sources-content">${sources.join(', ')}</div>
+                <ul class="sources-list">${formattedSources}</ul>
             </details>
         `;
     }

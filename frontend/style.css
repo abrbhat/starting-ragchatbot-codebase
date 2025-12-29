@@ -245,6 +245,33 @@ header h1 {
     color: var(--text-secondary);
 }
 
+/* Source links list */
+.sources-list {
+    list-style: none;
+    padding: 0.5rem 0;
+    margin: 0;
+}
+
+.sources-list li {
+    padding: 0.5rem 0.75rem;
+    margin: 0.25rem 0;
+    background: var(--background);
+    border-radius: 6px;
+    border: 1px solid var(--border-color);
+}
+
+.sources-list a {
+    color: var(--primary-color);
+    text-decoration: none;
+    display: block;
+    transition: color 0.2s ease;
+}
+
+.sources-list a:hover {
+    color: var(--primary-hover);
+    text-decoration: underline;
+}
+
 /* Markdown formatting styles */
 .message-content h1,
 .message-content h2,
@@ -632,6 +659,38 @@ details[open] .suggested-header::before {
     border-color: var(--primary-color);
     color: var(--primary-color);
     transform: translateX(2px);
+}
+
+/* Clear Chat Button */
+.clear-chat-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    background: var(--background);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-secondary);
+    font-size: 0.875rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.clear-chat-button:focus {
+    outline: none;
+    box-shadow: 0 0 0 3px var(--focus-ring);
+}
+
+.clear-chat-button:hover {
+    background: var(--surface-hover);
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+.clear-chat-button svg {
+    flex-shrink: 0;
 }
 
 /* Responsive Design */
