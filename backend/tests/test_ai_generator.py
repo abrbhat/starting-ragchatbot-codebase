@@ -1,4 +1,5 @@
 """Tests for AIGenerator tool calling behavior."""
+
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 import sys
@@ -17,6 +18,7 @@ from search_tools import CourseSearchTool, ToolManager
 @dataclass
 class SearchResults:
     """Local SearchResults for testing without chromadb dependency."""
+
     documents: List[str]
     metadata: List[Dict[str, Any]]
     distances: List[float]
@@ -32,7 +34,7 @@ class TestAIGeneratorToolCalling:
     @pytest.fixture
     def mock_anthropic_client(self):
         """Create a mock Anthropic client."""
-        with patch('ai_generator.anthropic.Anthropic') as mock:
+        with patch("ai_generator.anthropic.Anthropic") as mock:
             yield mock
 
     @pytest.fixture
@@ -52,9 +54,7 @@ class TestAIGeneratorToolCalling:
 
         tools = [{"name": "search_course_content", "description": "Search courses"}]
         result = ai_generator.generate_response(
-            query="What is MCP?",
-            tools=tools,
-            tool_manager=Mock()
+            query="What is MCP?", tools=tools, tool_manager=Mock()
         )
 
         # Verify API was called with tools
@@ -94,7 +94,9 @@ class TestAIGeneratorToolCalling:
         final_response = Mock()
         final_response.content = [Mock(text="MCP is a protocol for...")]
 
-        ai_generator.client.messages.create = Mock(side_effect=[initial_response, final_response])
+        ai_generator.client.messages.create = Mock(
+            side_effect=[initial_response, final_response]
+        )
 
         # Mock tool manager
         tool_manager = Mock()
@@ -102,15 +104,12 @@ class TestAIGeneratorToolCalling:
 
         tools = [{"name": "search_course_content"}]
         result = ai_generator.generate_response(
-            query="What is MCP?",
-            tools=tools,
-            tool_manager=tool_manager
+            query="What is MCP?", tools=tools, tool_manager=tool_manager
         )
 
         # Verify tool was executed
         tool_manager.execute_tool.assert_called_once_with(
-            "search_course_content",
-            query="What is MCP?"
+            "search_course_content", query="What is MCP?"
         )
 
     def test_tool_execution_passes_correct_parameters(self, ai_generator):
@@ -122,7 +121,7 @@ class TestAIGeneratorToolCalling:
         tool_use_block.input = {
             "query": "embeddings",
             "course_name": "Chroma",
-            "lesson_number": 3
+            "lesson_number": 3,
         }
 
         initial_response = Mock()
@@ -132,7 +131,9 @@ class TestAIGeneratorToolCalling:
         final_response = Mock()
         final_response.content = [Mock(text="Embeddings are...")]
 
-        ai_generator.client.messages.create = Mock(side_effect=[initial_response, final_response])
+        ai_generator.client.messages.create = Mock(
+            side_effect=[initial_response, final_response]
+        )
 
         tool_manager = Mock()
         tool_manager.execute_tool = Mock(return_value="Search results")
@@ -140,7 +141,7 @@ class TestAIGeneratorToolCalling:
         ai_generator.generate_response(
             query="Tell me about embeddings in the Chroma course lesson 3",
             tools=[{"name": "search_course_content"}],
-            tool_manager=tool_manager
+            tool_manager=tool_manager,
         )
 
         # Verify all parameters were passed
@@ -148,10 +149,12 @@ class TestAIGeneratorToolCalling:
             "search_course_content",
             query="embeddings",
             course_name="Chroma",
-            lesson_number=3
+            lesson_number=3,
         )
 
-    def test_generate_response_without_tools_returns_direct_response(self, ai_generator):
+    def test_generate_response_without_tools_returns_direct_response(
+        self, ai_generator
+    ):
         """Test that response without tools returns text directly."""
         mock_response = Mock()
         mock_response.stop_reason = "end_turn"
@@ -178,7 +181,9 @@ class TestAIGeneratorToolCalling:
         final_response = Mock()
         final_response.content = [Mock(text="Final answer")]
 
-        ai_generator.client.messages.create = Mock(side_effect=[initial_response, final_response])
+        ai_generator.client.messages.create = Mock(
+            side_effect=[initial_response, final_response]
+        )
 
         tool_manager = Mock()
         tool_manager.execute_tool = Mock(return_value="Tool execution result")
@@ -186,7 +191,7 @@ class TestAIGeneratorToolCalling:
         ai_generator.generate_response(
             query="test",
             tools=[{"name": "search_course_content"}],
-            tool_manager=tool_manager
+            tool_manager=tool_manager,
         )
 
         # Check second API call includes tool results
@@ -206,7 +211,7 @@ class TestAIGeneratorSystemPrompt:
     @pytest.fixture
     def ai_generator(self):
         """Create AIGenerator for prompt testing."""
-        with patch('ai_generator.anthropic.Anthropic'):
+        with patch("ai_generator.anthropic.Anthropic"):
             return AIGenerator(api_key="test-key", model="test-model")
 
     def test_system_prompt_mentions_search_tool(self, ai_generator):
@@ -237,7 +242,7 @@ class TestAIGeneratorSystemPrompt:
 
         ai_generator.generate_response(
             query="Follow up question",
-            conversation_history="User: Hi\nAssistant: Hello"
+            conversation_history="User: Hi\nAssistant: Hello",
         )
 
         call_kwargs = ai_generator.client.messages.create.call_args[1]
@@ -261,11 +266,12 @@ class TestAIGeneratorToolManagerIntegration:
         manager.register_tool(tool)
         return manager
 
-    def test_tool_manager_executes_search_correctly(self, real_tool_manager, mock_vector_store, sample_search_results):
+    def test_tool_manager_executes_search_correctly(
+        self, real_tool_manager, mock_vector_store, sample_search_results
+    ):
         """Test that ToolManager correctly executes search_course_content."""
         result = real_tool_manager.execute_tool(
-            "search_course_content",
-            query="What is MCP?"
+            "search_course_content", query="What is MCP?"
         )
 
         # Should return formatted search results
