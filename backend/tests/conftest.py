@@ -1,4 +1,5 @@
 """Shared pytest fixtures for testing the RAG system."""
+
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 import sys
@@ -21,10 +22,10 @@ mock_sentence_transformers.SentenceTransformer = Mock()
 mock_anthropic = Mock()
 mock_anthropic.Anthropic = Mock()
 
-sys.modules['chromadb'] = mock_chromadb
-sys.modules['chromadb.config'] = mock_chromadb.config
-sys.modules['sentence_transformers'] = mock_sentence_transformers
-sys.modules['anthropic'] = mock_anthropic
+sys.modules["chromadb"] = mock_chromadb
+sys.modules["chromadb.config"] = mock_chromadb.config
+sys.modules["sentence_transformers"] = mock_sentence_transformers
+sys.modules["anthropic"] = mock_anthropic
 
 # Add backend to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -120,6 +121,7 @@ def test_client(test_app):
 @dataclass
 class SearchResults:
     """Local copy of SearchResults for testing without chromadb dependency."""
+
     documents: List[str]
     metadata: List[Dict[str, Any]]
     distances: List[float]
@@ -143,24 +145,28 @@ def sample_search_results():
     return SearchResults(
         documents=[
             "MCP allows Claude to connect to external data sources and tools.",
-            "The Model Context Protocol provides a standardized way for AI to access resources."
+            "The Model Context Protocol provides a standardized way for AI to access resources.",
         ],
         metadata=[
-            {"course_title": "MCP: Build Rich-Context AI Apps", "lesson_number": 1, "chunk_index": 0},
-            {"course_title": "MCP: Build Rich-Context AI Apps", "lesson_number": 2, "chunk_index": 5}
+            {
+                "course_title": "MCP: Build Rich-Context AI Apps",
+                "lesson_number": 1,
+                "chunk_index": 0,
+            },
+            {
+                "course_title": "MCP: Build Rich-Context AI Apps",
+                "lesson_number": 2,
+                "chunk_index": 5,
+            },
         ],
-        distances=[0.25, 0.35]
+        distances=[0.25, 0.35],
     )
 
 
 @pytest.fixture
 def empty_search_results():
     """Create empty SearchResults for testing."""
-    return SearchResults(
-        documents=[],
-        metadata=[],
-        distances=[]
-    )
+    return SearchResults(documents=[], metadata=[], distances=[])
 
 
 @pytest.fixture
@@ -170,7 +176,7 @@ def error_search_results():
         documents=[],
         metadata=[],
         distances=[],
-        error="No course found matching 'NonExistentCourse'"
+        error="No course found matching 'NonExistentCourse'",
     )
 
 
@@ -182,10 +188,22 @@ def sample_course_metadata():
         "course_link": "https://example.com/mcp-course",
         "instructor": "Test Instructor",
         "lessons": [
-            {"lesson_number": 0, "lesson_title": "Introduction", "lesson_link": "https://example.com/lesson0"},
-            {"lesson_number": 1, "lesson_title": "Why MCP", "lesson_link": "https://example.com/lesson1"},
-            {"lesson_number": 2, "lesson_title": "MCP Architecture", "lesson_link": "https://example.com/lesson2"},
-        ]
+            {
+                "lesson_number": 0,
+                "lesson_title": "Introduction",
+                "lesson_link": "https://example.com/lesson0",
+            },
+            {
+                "lesson_number": 1,
+                "lesson_title": "Why MCP",
+                "lesson_link": "https://example.com/lesson1",
+            },
+            {
+                "lesson_number": 2,
+                "lesson_title": "MCP Architecture",
+                "lesson_link": "https://example.com/lesson2",
+            },
+        ],
     }
 
 
@@ -193,6 +211,7 @@ def sample_course_metadata():
 def course_search_tool(mock_vector_store):
     """Create a CourseSearchTool with mocked vector store."""
     from search_tools import CourseSearchTool
+
     tool = CourseSearchTool(mock_vector_store)
     return tool
 
@@ -201,6 +220,7 @@ def course_search_tool(mock_vector_store):
 def course_outline_tool(mock_vector_store):
     """Create a CourseOutlineTool with mocked vector store."""
     from search_tools import CourseOutlineTool
+
     tool = CourseOutlineTool(mock_vector_store)
     return tool
 
@@ -209,6 +229,7 @@ def course_outline_tool(mock_vector_store):
 def tool_manager(course_search_tool, course_outline_tool):
     """Create a ToolManager with both tools registered."""
     from search_tools import ToolManager
+
     manager = ToolManager()
     manager.register_tool(course_search_tool)
     manager.register_tool(course_outline_tool)

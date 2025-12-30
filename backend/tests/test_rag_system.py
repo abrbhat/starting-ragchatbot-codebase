@@ -1,4 +1,5 @@
 """Tests for RAGSystem content-query handling."""
+
 import pytest
 from unittest.mock import Mock, MagicMock, patch
 import sys
@@ -10,6 +11,7 @@ from typing import List, Dict, Any, Optional
 @dataclass
 class SearchResults:
     """Local SearchResults for testing without chromadb dependency."""
+
     documents: List[str]
     metadata: List[Dict[str, Any]]
     distances: List[float]
@@ -39,10 +41,12 @@ class TestRAGSystemContentQueries:
     @pytest.fixture
     def mock_rag_system(self, mock_config):
         """Create a RAGSystem with mocked components."""
-        with patch('rag_system.DocumentProcessor'), \
-             patch('rag_system.VectorStore') as MockVectorStore, \
-             patch('rag_system.AIGenerator') as MockAIGenerator, \
-             patch('rag_system.SessionManager'):
+        with (
+            patch("rag_system.DocumentProcessor"),
+            patch("rag_system.VectorStore") as MockVectorStore,
+            patch("rag_system.AIGenerator") as MockAIGenerator,
+            patch("rag_system.SessionManager"),
+        ):
 
             from rag_system import RAGSystem
 
@@ -52,13 +56,15 @@ class TestRAGSystemContentQueries:
             mock_vector_store.search.return_value = SearchResults(
                 documents=["Content about MCP protocol"],
                 metadata=[{"course_title": "MCP Course", "lesson_number": 1}],
-                distances=[0.2]
+                distances=[0.2],
             )
-            mock_vector_store.get_lesson_link.return_value = "https://example.com/lesson1"
+            mock_vector_store.get_lesson_link.return_value = (
+                "https://example.com/lesson1"
+            )
             mock_vector_store.get_course_metadata.return_value = {
                 "title": "MCP Course",
                 "course_link": "https://example.com",
-                "lessons": [{"lesson_number": 1, "lesson_title": "Intro"}]
+                "lessons": [{"lesson_number": 1, "lesson_title": "Intro"}],
             }
 
             # Configure mock AI generator
@@ -99,7 +105,9 @@ class TestRAGSystemContentQueries:
     def test_query_retrieves_sources_from_tool_manager(self, mock_rag_system):
         """Test that sources are retrieved from tool manager after query."""
         # Simulate tool having captured sources
-        mock_rag_system.search_tool.last_sources = ["MCP Course - Lesson 1|https://example.com"]
+        mock_rag_system.search_tool.last_sources = [
+            "MCP Course - Lesson 1|https://example.com"
+        ]
 
         response, sources = mock_rag_system.query("What is MCP?")
 
@@ -116,7 +124,9 @@ class TestRAGSystemContentQueries:
 
     def test_query_includes_session_history_when_provided(self, mock_rag_system):
         """Test that conversation history is passed when session_id provided."""
-        mock_rag_system.session_manager.get_conversation_history.return_value = "Previous conversation"
+        mock_rag_system.session_manager.get_conversation_history.return_value = (
+            "Previous conversation"
+        )
 
         mock_rag_system.query("Follow up question", session_id="session123")
 
@@ -151,12 +161,15 @@ class TestRAGSystemToolRegistration:
         mock_config.ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
         mock_config.MAX_HISTORY = 10
 
-        with patch('rag_system.DocumentProcessor'), \
-             patch('rag_system.VectorStore'), \
-             patch('rag_system.AIGenerator'), \
-             patch('rag_system.SessionManager'):
+        with (
+            patch("rag_system.DocumentProcessor"),
+            patch("rag_system.VectorStore"),
+            patch("rag_system.AIGenerator"),
+            patch("rag_system.SessionManager"),
+        ):
 
             from rag_system import RAGSystem
+
             return RAGSystem(mock_config)
 
     def test_search_tool_is_registered(self, mock_rag_system):
@@ -193,12 +206,15 @@ class TestRAGSystemQueryPrompt:
         mock_config.ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
         mock_config.MAX_HISTORY = 10
 
-        with patch('rag_system.DocumentProcessor'), \
-             patch('rag_system.VectorStore'), \
-             patch('rag_system.AIGenerator'), \
-             patch('rag_system.SessionManager'):
+        with (
+            patch("rag_system.DocumentProcessor"),
+            patch("rag_system.VectorStore"),
+            patch("rag_system.AIGenerator"),
+            patch("rag_system.SessionManager"),
+        ):
 
             from rag_system import RAGSystem
+
             return RAGSystem(mock_config)
 
     def test_query_wraps_user_question(self, mock_rag_system):
@@ -232,10 +248,12 @@ class TestRAGSystemEndToEnd:
         mock_config.ANTHROPIC_MODEL = "claude-sonnet-4-20250514"
         mock_config.MAX_HISTORY = 10
 
-        with patch('rag_system.DocumentProcessor'), \
-             patch('rag_system.VectorStore') as MockVectorStore, \
-             patch('rag_system.AIGenerator') as MockAIGenerator, \
-             patch('rag_system.SessionManager'):
+        with (
+            patch("rag_system.DocumentProcessor"),
+            patch("rag_system.VectorStore") as MockVectorStore,
+            patch("rag_system.AIGenerator") as MockAIGenerator,
+            patch("rag_system.SessionManager"),
+        ):
 
             # Set up vector store to return results
             mock_vs = MockVectorStore.return_value
@@ -243,11 +261,12 @@ class TestRAGSystemEndToEnd:
             mock_vs.search.return_value = SearchResults(
                 documents=["MCP is the Model Context Protocol..."],
                 metadata=[{"course_title": "MCP Course", "lesson_number": 1}],
-                distances=[0.15]
+                distances=[0.15],
             )
             mock_vs.get_lesson_link.return_value = "https://example.com/mcp/lesson1"
 
             from rag_system import RAGSystem
+
             rag = RAGSystem(mock_config)
 
             # Store mock for assertions
@@ -258,8 +277,7 @@ class TestRAGSystemEndToEnd:
         """Test that content queries can trigger vector store search."""
         # Execute search tool directly to verify it works
         result = integrated_rag_system.tool_manager.execute_tool(
-            "search_course_content",
-            query="What is MCP?"
+            "search_course_content", query="What is MCP?"
         )
 
         # Verify vector store was searched
@@ -269,8 +287,7 @@ class TestRAGSystemEndToEnd:
     def test_search_results_formatted_with_sources(self, integrated_rag_system):
         """Test that search results include source information."""
         result = integrated_rag_system.tool_manager.execute_tool(
-            "search_course_content",
-            query="MCP protocol"
+            "search_course_content", query="MCP protocol"
         )
 
         # Result should include course context
@@ -283,9 +300,7 @@ class TestRAGSystemEndToEnd:
     def test_search_with_course_filter(self, integrated_rag_system):
         """Test that course filter is passed to vector store."""
         integrated_rag_system.tool_manager.execute_tool(
-            "search_course_content",
-            query="architecture",
-            course_name="MCP"
+            "search_course_content", query="architecture", course_name="MCP"
         )
 
         # Verify filter was passed
@@ -295,9 +310,7 @@ class TestRAGSystemEndToEnd:
     def test_search_with_lesson_filter(self, integrated_rag_system):
         """Test that lesson filter is passed to vector store."""
         integrated_rag_system.tool_manager.execute_tool(
-            "search_course_content",
-            query="introduction",
-            lesson_number=0
+            "search_course_content", query="introduction", lesson_number=0
         )
 
         call_kwargs = integrated_rag_system._mock_vector_store.search.call_args[1]
