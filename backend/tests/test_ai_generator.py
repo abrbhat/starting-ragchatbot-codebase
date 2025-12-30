@@ -294,3 +294,247 @@ class TestAIGeneratorToolManagerIntegration:
             assert "input_schema" in tool_def
             assert "type" in tool_def["input_schema"]
             assert tool_def["input_schema"]["type"] == "object"
+
+
+class TestAIGeneratorSequentialToolCalling:
+    """Test suite for AIGenerator's sequential tool calling mechanism."""
+
+    @pytest.fixture
+    def mock_anthropic_client(self):
+        """Create a mock Anthropic client."""
+        with patch('ai_generator.anthropic.Anthropic') as mock:
+            yield mock
+
+    @pytest.fixture
+    def ai_generator(self, mock_anthropic_client):
+        """Create an AIGenerator with mocked client."""
+        generator = AIGenerator(api_key="test-key", model="claude-sonnet-4-20250514")
+        return generator
+
+    def _create_tool_use_response(self, tool_name: str, tool_id: str, tool_input: dict, stop_reason: str = "tool_use"):
+        """Helper to create a mock tool use response."""
+        tool_use_block = Mock()
+        tool_use_block.type = "tool_use"
+        tool_use_block.name = tool_name
+        tool_use_block.id = tool_id
+        tool_use_block.input = tool_input
+
+        response = Mock()
+        response.stop_reason = stop_reason
+        response.content = [tool_use_block]
+        return response
+
+    def _create_text_response(self, text: str, stop_reason: str = "end_turn"):
+        """Helper to create a mock text response."""
+        text_block = Mock()
+        text_block.text = text
+        text_block.type = "text"
+
+        response = Mock()
+        response.stop_reason = stop_reason
+        response.content = [text_block]
+        return response
+
+    def test_two_sequential_tool_calls_success(self, ai_generator):
+        """Test that two sequential tool calls execute correctly with 3 API calls."""
+        # First response: get_course_outline tool use
+        first_tool_response = self._create_tool_use_response(
+            "get_course_outline", "tool_1", {"course_title": "MCP"}
+        )
+
+        # Second response: search_course_content tool use
+        second_tool_response = self._create_tool_use_response(
+            "search_course_content", "tool_2", {"query": "MCP basics"}
+        )
+
+        # Third response: final text answer
+        final_response = self._create_text_response("MCP is a protocol that...")
+
+        ai_generator.client.messages.create = Mock(
+            side_effect=[first_tool_response, second_tool_response, final_response]
+        )
+
+        tool_manager = Mock()
+        tool_manager.execute_tool = Mock(side_effect=[
+            "Course: MCP, Lessons: 1, 2, 3",
+            "MCP stands for Model Context Protocol"
+        ])
+
+        tools = [{"name": "get_course_outline"}, {"name": "search_course_content"}]
+        result = ai_generator.generate_response(
+            query="What is MCP?",
+            tools=tools,
+            tool_manager=tool_manager
+        )
+
+        # Should make 3 API calls
+        assert ai_generator.client.messages.create.call_count == 3
+
+        # Both tools should be executed
+        assert tool_manager.execute_tool.call_count == 2
+
+        # Final result should be the text response
+        assert result == "MCP is a protocol that..."
+
+    def test_early_termination_no_second_tool_use(self, ai_generator):
+        """Test that loop exits early when response doesn't request tool use."""
+        # First response requests tool use
+        first_response = self._create_tool_use_response(
+            "search_course_content", "tool_1", {"query": "test"}
+        )
+
+        # Second response returns text (no tool use)
+        second_response = self._create_text_response("Direct answer here")
+
+        ai_generator.client.messages.create = Mock(
+            side_effect=[first_response, second_response]
+        )
+
+        tool_manager = Mock()
+        tool_manager.execute_tool = Mock(return_value="Search results")
+
+        result = ai_generator.generate_response(
+            query="test",
+            tools=[{"name": "search_course_content"}],
+            tool_manager=tool_manager
+        )
+
+        # Should only make 2 API calls (exits early)
+        assert ai_generator.client.messages.create.call_count == 2
+
+        # Only one tool executed
+        assert tool_manager.execute_tool.call_count == 1
+
+        assert result == "Direct answer here"
+
+    def test_max_rounds_limit_enforced(self, ai_generator):
+        """Test that tool calling stops at MAX_TOOL_ROUNDS and final call has no tools."""
+        # Both responses request tool use (to test limit enforcement)
+        first_response = self._create_tool_use_response(
+            "get_course_outline", "tool_1", {"course_title": "MCP"}
+        )
+        second_response = self._create_tool_use_response(
+            "search_course_content", "tool_2", {"query": "MCP"}
+        )
+        final_response = self._create_text_response("Final answer after max rounds")
+
+        ai_generator.client.messages.create = Mock(
+            side_effect=[first_response, second_response, final_response]
+        )
+
+        tool_manager = Mock()
+        tool_manager.execute_tool = Mock(return_value="Tool result")
+
+        result = ai_generator.generate_response(
+            query="test",
+            tools=[{"name": "test_tool"}],
+            tool_manager=tool_manager
+        )
+
+        # Should make exactly 3 API calls (2 with tools + 1 final without tools)
+        assert ai_generator.client.messages.create.call_count == 3
+
+        # Final call should NOT have tools
+        final_call_kwargs = ai_generator.client.messages.create.call_args_list[2][1]
+        assert "tools" not in final_call_kwargs
+
+        assert result == "Final answer after max rounds"
+
+    def test_tool_execution_error_handling(self, ai_generator):
+        """Test that tool execution errors are caught and passed to Claude."""
+        tool_response = self._create_tool_use_response(
+            "search_course_content", "tool_1", {"query": "test"}
+        )
+        final_response = self._create_text_response("I encountered an error...")
+
+        ai_generator.client.messages.create = Mock(
+            side_effect=[tool_response, final_response]
+        )
+
+        tool_manager = Mock()
+        tool_manager.execute_tool = Mock(side_effect=Exception("Database connection failed"))
+
+        result = ai_generator.generate_response(
+            query="test",
+            tools=[{"name": "search_course_content"}],
+            tool_manager=tool_manager
+        )
+
+        # Should still make follow-up call with error message
+        assert ai_generator.client.messages.create.call_count == 2
+
+        # Check that error was passed in tool result
+        second_call_messages = ai_generator.client.messages.create.call_args_list[1][1]["messages"]
+        tool_result_message = second_call_messages[-1]  # Last message should be tool result
+        assert "Error executing tool" in tool_result_message["content"][0]["content"]
+
+    def test_conversation_context_preserved(self, ai_generator):
+        """Test that messages accumulate correctly across tool rounds."""
+        first_response = self._create_tool_use_response(
+            "get_course_outline", "tool_1", {"course_title": "MCP"}
+        )
+        second_response = self._create_tool_use_response(
+            "search_course_content", "tool_2", {"query": "MCP details"}
+        )
+        final_response = self._create_text_response("Complete answer")
+
+        ai_generator.client.messages.create = Mock(
+            side_effect=[first_response, second_response, final_response]
+        )
+
+        tool_manager = Mock()
+        tool_manager.execute_tool = Mock(side_effect=["Outline result", "Search result"])
+
+        ai_generator.generate_response(
+            query="What is MCP?",
+            tools=[{"name": "test"}],
+            tool_manager=tool_manager
+        )
+
+        # Check final call has correct message accumulation
+        # Should have: user query, assistant tool_use 1, user tool_result 1,
+        #              assistant tool_use 2, user tool_result 2
+        final_call_messages = ai_generator.client.messages.create.call_args_list[2][1]["messages"]
+        assert len(final_call_messages) == 5
+
+        # Verify message structure
+        assert final_call_messages[0]["role"] == "user"  # Original query
+        assert final_call_messages[1]["role"] == "assistant"  # First tool use
+        assert final_call_messages[2]["role"] == "user"  # First tool result
+        assert final_call_messages[3]["role"] == "assistant"  # Second tool use
+        assert final_call_messages[4]["role"] == "user"  # Second tool result
+
+    def test_no_tool_manager_returns_direct_response(self, ai_generator):
+        """Test that without tool_manager, tool_use responses return directly."""
+        # Even with tool_use stop_reason, no execution without tool_manager
+        tool_response = self._create_tool_use_response(
+            "search_course_content", "tool_1", {"query": "test"}
+        )
+        # Add a text block to the response for fallback
+        text_block = Mock()
+        text_block.text = "Would search for..."
+        text_block.type = "text"
+        tool_response.content.insert(0, text_block)
+
+        ai_generator.client.messages.create = Mock(return_value=tool_response)
+
+        # No tool_manager provided
+        result = ai_generator.generate_response(
+            query="test",
+            tools=[{"name": "search_course_content"}],
+            tool_manager=None
+        )
+
+        # Should return without executing tools
+        assert ai_generator.client.messages.create.call_count == 1
+        assert result == "Would search for..."
+
+    def test_system_prompt_allows_sequential_tool_calling(self, ai_generator):
+        """Test that system prompt no longer restricts to one tool per query."""
+        prompt = ai_generator.SYSTEM_PROMPT
+
+        # Should NOT have the old restriction
+        assert "One tool use per query maximum" not in prompt
+
+        # Should have new sequential guidance
+        assert "sequentially" in prompt.lower() or "sequential" in prompt.lower()
