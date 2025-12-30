@@ -1,11 +1,12 @@
 import anthropic
+import json
 from typing import List, Optional, Dict, Any
 
 class AIGenerator:
     """Handles interactions with Anthropic's Claude API for generating responses"""
     
     # Static system prompt to avoid rebuilding on each call
-    SYSTEM_PROMPT = """ You are an AI assistant specialized in course materials and educational content with access to tools for searching course content and retrieving course outlines.
+    SYSTEM_PROMPT = """ You are an AI assistant named Alfie, specialized in course materials and educational content with access to tools for searching course content and retrieving course outlines.
 
 Available Tools:
 1. **search_course_content**: Search course materials for specific content or detailed educational materials
@@ -36,6 +37,7 @@ Response Protocol:
 - **Course content questions**: Use search_course_content, then answer
 - **No meta-commentary**:
  - Provide direct answers only — no reasoning process, search explanations, or question-type analysis
+ - Start every answer with "Hi I'm Alfie, your course assistant!"
  - Do not mention "based on the search results" or "based on the outline"
 
 All responses must be:
@@ -92,10 +94,8 @@ Provide only the direct answer to what was asked.
         if tools:
             api_params["tools"] = tools
             api_params["tool_choice"] = {"type": "auto"}
-        
         # Get response from Claude
         response = self.client.messages.create(**api_params)
-        
         # Handle tool execution if needed
         if response.stop_reason == "tool_use" and tool_manager:
             return self._handle_tool_execution(response, api_params, tool_manager)
@@ -146,7 +146,12 @@ Provide only the direct answer to what was asked.
             "messages": messages,
             "system": base_params["system"]
         }
-        
+
+        print("Final Params:")
+        print(json.dumps(final_params, indent=2, default=str))
+
         # Get final response
         final_response = self.client.messages.create(**final_params)
+        print("Final Response:")
+        print(final_response)
         return final_response.content[0].text
